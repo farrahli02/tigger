@@ -1,0 +1,11 @@
+#!/bin/dash
+
+# If .tigger already exists, print error otherwise make new directory and print success message
+if [ -d '.tigger' ] 
+then
+    echo tigger-init: error: .tigger already exists
+
+else 
+    mkdir '.tigger'
+    echo Initialized empty tigger repository in .tigger
+fi

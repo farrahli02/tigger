@@ -1,0 +1,35 @@
+#!/bin/dash
+
+# Save arguments into variables
+commit_num=$(echo $1 | cut -f1 -d':')
+filename=$(echo $1 | cut -f2 -d':')
+
+
+# Depending on number of arguments given, enter either index or commit folder
+if [ -z "$commit_num" ]
+then
+    cd .tigger/index
+    dir='index'
+else
+    # Test if the commit folder exists
+    if test ! -d .tigger/.commit.$commit_num
+    then
+        echo "tigger-show: error: unknown commit '"$commit_num"'"
+        exit
+    fi
+    cd .tigger/.commit.$commit_num
+    dir="commit $commit_num"
+fi
+
+# Test if file exists in directory
+if test ! -f "$filename" > /dev/null 2>&1
+then
+    echo "tigger-show: error: '"$filename"' not found in $dir"
+    exit
+fi
+
+# Print out specified file
+for file in $filename
+do 
+    cat $file
+done

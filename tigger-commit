@@ -1,0 +1,72 @@
+#!/bin/dash
+
+# Copy files from index to a folder into repository named .commit.0
+# Loop through files starting with .commit and make sure commit number is right
+# Create a log file in repo and append >> the commit number and message
+
+# If no arguments are given or if tigger repository does not exist, print error and exit
+if [ "$#" -eq "0" ]
+then  
+    echo 'usage: tigger-commit [-a] -m commit-message'
+    exit
+elif  [ ! -d '.tigger' ]
+then
+    echo 'tigger-commit: error: tigger repository directory .tigger not found'
+    exit
+fi
+
+# Get commit message
+if test $1 = '-a' 
+then
+    msg=$3
+else
+    msg=$2
+fi
+
+# If aflag is on, we need to copy files from current repository into index repository
+if [ $1 = "-a" ]
+then
+    rm '.tigger/index/'* > /dev/null 2>&1
+    for file in *
+    do
+        if [ -d $file ] || [ $file = "tigger-add" ] || [ $file = "tigger-commit" ] || [ $file = "tigger-init" ] || [ $file = "tigger-log" ] || [ $file = "tigger-show" ] || [ $file = "tigger-rm" ] || [ $file = "tigger-status" ]
+        then
+            continue
+        fi
+        cp $file '.tigger/index'
+    done
+fi
+
+# Get new commit number
+commit_num=0
+cd .tigger
+while [ -d "."commit.$commit_num ]
+do
+    commit_num=$(( commit_num + 1 ))
+done
+
+# Check if directory is the same as previous, if the same echo nothing to commit 
+cd ..
+prev_commit=$(( commit_num - 1 ))
+if [ prev_commit -le 0 ]  > /dev/null 2>&1
+then 
+    continue
+elif diff -q ./.tigger/index/. ./.tigger/.commit.$prev_commit/  > /dev/null 2>&1
+then
+    echo nothing to commit
+    exit
+fi
+
+# Make new commit folder in .tigger
+cd .tigger
+mkdir "."commit.$commit_num
+
+# Log file for messages
+echo $commit_num $msg >> 'COMMIT_EDITMSG'
+
+#Copy over files into new commit folder 
+cd ..
+cp -r ./.tigger/index/. ./.tigger/.commit.$commit_num/
+
+# Success message
+echo Committed as commit $commit_num

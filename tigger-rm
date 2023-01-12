@@ -1,0 +1,82 @@
+#!/bin/dash
+
+# If no arguments are given or if tigger repository does not exist, print error and exit
+if [ "$#" -eq "0" ]
+then  
+    echo 'usage: tigger-rm [--force] [--cached] <filenames>'
+    exit
+elif  [ ! -d '.tigger' ]
+then
+    echo 'tigger-rm: error: tigger repository directory .tigger not found'
+    exit
+fi
+
+# Get last commit number
+commit_num=0
+cd .tigger
+while [ -d "."commit.$commit_num ]
+do
+    commit_num=$(( commit_num + 1 ))
+done
+prev_commit=$(( commit_num - 1 ))
+cd ..
+
+# Loop through arguments and continue if --cached or --force
+for filename in "$@"
+do
+    if test $filename = '--cached' || test $filename = '--force'
+    then 
+        continue
+    else
+        # Check if file exists in index, if not exists print
+        # tigger-rm: error: 'file.txt' is not in the tigger repository
+        cd .tigger
+        cd index
+        if test ! -f "$filename" > /dev/null 2>&1
+        then
+            echo "tigger-rm: error: '"$filename"' is not in the tigger repository"
+            continue
+        fi
+
+        cd ..
+        cd ..
+        # If $1 or $2 is --cached, remove file only from index
+        if [ $1 = "--cached" ] || [ $2 = "--cached" ] > /dev/null 2>&1
+        then
+            if [ prev_commit -le 0 ]  > /dev/null 2>&1
+            then 
+                continue
+            # Check if file in index is different to both the directory and last commit. && $1 is not --force
+            elif ! diff -q ./.tigger/index/$filename ./.tigger/.commit.$prev_commit/$filename > /dev/null 2>&1 && ! diff -q ./.tigger/index/$filename $filename > /dev/null 2>&1 && [ "$1" != "--force" ] > /dev/null 2>&1
+            then
+                echo "tigger-rm: error: '$filename' in index is different to both the working file and the repository"
+                continue
+            fi
+            #echo removed file from index
+            rm ".tigger/index/$filename"
+
+        else
+            # Without --cached arguement remove from both index and directory
+            if ! diff -q ./.tigger/.commit.$prev_commit/$filename ./.tigger/index/$filename > /dev/null 2>&1 && ! diff -q ./.tigger/.commit.$prev_commit/$filename $filename > /dev/null 2>&1 && ! diff -q ./.tigger/index/$filename $filename > /dev/null 2>&1 && [ "$1" != "--force" ] > /dev/null 2>&1
+            then
+                echo "tigger-rm: error: '$filename' in index is different to both the working file and the repository"
+                continue
+            # Check if file in directory is different to file in the last commit && $1 is not --force
+            elif ! diff -q ./.tigger/index/$filename $filename > /dev/null 2>&1 && diff -q ./.tigger/index/$filename ./.tigger/.commit.$prev_commit/$filename > /dev/null 2>&1 && [ "$1" != "--force" ] > /dev/null 2>&1
+            then
+                echo "tigger-rm: error: '$filename' in the repository is different to the working file"
+                continue
+            # Check if file in index is different to file in last commit && $1 is not --force
+            elif ! diff -q ./.tigger/.commit.$prev_commit/$filename ./.tigger/index/$filename > /dev/null 2>&1 && diff -q ./.tigger/index/$filename $filename > /dev/null 2>&1 && [ "$1" != "--force" ] > /dev/null 2>&1
+            then
+                echo "tigger-rm: error: '$filename' has staged changes in the index"
+                continue
+            fi
+            #echo removed file from index and directory
+            rm ".tigger/index/$filename"
+            rm "$filename"
+        fi
+    fi
+done
+
+

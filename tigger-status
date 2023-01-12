@@ -1,0 +1,122 @@
+#!/bin/dash
+
+# Get last commit number
+commit_num=0
+cd .tigger
+while [ -d "."commit.$commit_num ]
+do
+    commit_num=$(( commit_num + 1 ))
+done
+prev_commit=$(( commit_num - 1 ))
+cd ..
+
+# Loop through all the files in directory
+for filename in *
+do
+    if [ -d $filename ] || [ $filename = "tigger-add" ] || [ $filename = "tigger-commit" ] || [ $filename = "tigger-init" ] || [ $filename = "tigger-log" ] || [ $filename = "tigger-show" ] || [ $filename = "tigger-rm" ] || [ $filename = "tigger-status" ] || [ $filename = "*" ]
+    then
+        continue
+    fi
+
+    # If file exists in index
+    if test -f .tigger/index/$filename > /dev/null 2>&1
+    then
+
+        # If file in index is different to the file in directory 
+        if ! diff -q $filename ./.tigger/index/$filename > /dev/null 2>&1
+        then
+
+            # If file in the last commit is different to file in index and last commit different to directory:
+            if ! diff -q ./.tigger/.commit.$prev_commit/$filename ./.tigger/index/$filename > /dev/null 2>&1 && ! diff -q ./.tigger/.commit.$prev_commit/$filename $filename > /dev/null 2>&1
+            then
+                if grep -E "$filename - added to index" .tigger/STATUS_MSG  > /dev/null 2>&1
+                then
+                    #echo "$filename - added to index, file changed" >> .tigger/STATUS_MSG
+                    #sed -i "/$filename - added to index/d" .tigger/STATUS_MSG
+                    sed -i "s/$filename - added to index/$filename - added to index, file changed/g" ".tigger/STATUS_MSG"
+                else
+                    echo "$filename - file changed, different changes staged for commit" >> .tigger/STATUS_MSG
+                fi
+                
+            # If file in last commit is same as file in index and last commit different to directory (c)
+            elif diff -q ./.tigger/.commit.$prev_commit/$filename ./.tigger/index/$filename > /dev/null 2>&1 && ! diff -q ./.tigger/.commit.$prev_commit/$filename $filename > /dev/null 2>&1
+            then
+                echo "$filename - file changed, changes not staged for commit" >> .tigger/STATUS_MSG
+            fi
+
+        # else if file in index same as file in directory 
+        elif diff -q $filename ./.tigger/index/$filename > /dev/null 2>&1
+        then
+            # if file exists in commit and is different to file in index and different to file in directory:
+            if test -f .tigger/.commit.$prev_commit/$filename > /dev/null 2>&1 && ! diff -q ./.tigger/.commit.$prev_commit/$filename ./.tigger/index/$filename > /dev/null 2>&1 && ! diff -q ./.tigger/.commit.$prev_commit/$filename $filename > /dev/null 2>&1
+            then
+                echo "$filename - file changed, changes staged for commit" >> .tigger/STATUS_MSG
+            # elif file does not exist in commit (g)
+            elif test ! -f .tigger/.commit.$prev_commit/$filename > /dev/null 2>&1 
+            then
+                echo "$filename - added to index" >> .tigger/STATUS_MSG
+            # elif dir = commit and index = commit (f)
+            elif diff -q $filename .tigger/.commit.$prev_commit/$filename > /dev/null 2>&1 && diff -q .tigger/.commit.$prev_commit/$filename ./.tigger/index/$filename > /dev/null 2>&1 
+            then
+                echo "$filename - same as repo" >> .tigger/STATUS_MSG
+            fi
+        fi
+    # else if file does not exist in index 
+    elif test ! -f .tigger/index/$filename > /dev/null 2>&1 && test ! $filename = '*' > /dev/null 2>&1
+    then
+        echo "$filename - untracked" >> .tigger/STATUS_MSG
+    fi
+done
+
+# Loop through files in index 
+#cd .tigger > /dev/null 2>&1
+#cd index > /dev/null 2>&1
+
+cd .tigger
+cd index
+for filename in *
+do
+    # If file exists in commit and not in directory
+    cd ..
+    cd ..
+    if test ! -f $filename > /dev/null 2>&1 && test ! $filename = '*' > /dev/null 2>&1
+    then
+        # if file in commit is same as index (D)
+        if grep -E "$filename - added to index" .tigger/STATUS_MSG  > /dev/null 2>&1
+        then
+            sed -i "s/$filename - added to index/$filename - added to index, file deleted/g" ".tigger/STATUS_MSG"
+        else
+            echo "$filename - file deleted" >> .tigger/STATUS_MSG
+        fi
+    fi
+    cd .tigger
+    cd index
+done
+
+cd ..
+cd .commit.$prev_commit
+# Loop through files in last commit 
+    # echo deleted
+for filename in *
+do
+    cd ..
+    cd ..
+    if test ! -f $filename > /dev/null 2>&1 && test ! -f .tigger/index/$filename > /dev/null 2>&1 && test ! $filename = '*' > /dev/null 2>&1
+    then
+        echo "$filename - deleted" >> .tigger/STATUS_MSG
+    fi
+    cd .tigger
+    cd .commit.$prev_commit
+done
+
+cd ..
+cd ..
+cat .tigger/STATUS_MSG | sort | uniq
+#> .tigger/STATUS_MSG
+
+
+
+while read msg; 
+do
+    sed -i '/- deleted/d' .tigger/STATUS_MSG
+done <.tigger/STATUS_MSG

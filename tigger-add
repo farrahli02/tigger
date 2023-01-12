@@ -1,0 +1,42 @@
+#!/bin/dash 
+
+# If no arguments are given 
+if [ "$#" -eq "0" ]
+then  
+    echo 'usage: tigger-add <filenames>'
+
+elif  [ ! -d '.tigger' ]
+then
+    echo 'tigger-add: error: tigger repository directory .tigger not found'
+    exit
+fi
+
+for file in "$@"
+do
+    cd '.tigger'
+    # Check if index directory already exists, otherwise create index
+    if [ ! -d 'index' ]
+    then
+        mkdir 'index'
+    fi
+    cd ..
+
+    # If file does not exist in directory send error msg
+    # If file exists in index but doesn't exist in directory, remove file from index as a 'change'
+    if test ! -f "$file" > /dev/null 2>&1
+    then
+        cd .tigger > /dev/null 2>&1
+        cd index > /dev/null 2>&1
+        if test ! -f "$file"
+        then
+            echo tigger-add: error: can not open "'"$file"'"
+            break
+        else
+            rm "$file"
+            break
+        fi
+    fi
+
+    # Copy file into index - overwrites if there is file with the same name 
+    cp "$file" '.tigger/index'
+done
